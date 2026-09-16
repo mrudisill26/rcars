@@ -914,6 +914,11 @@ class Database:
 
     def retire_missing_osspa(self, active_content_ids: set[str]) -> list[dict]:
         """Soft-retire portfolio_arch rows absent from the current in-scope set."""
+        if not active_content_ids:
+            logger.warning("retire_skipped_empty_scan",
+                           component="rcars", action="retire_removed",
+                           reason="Empty OSSPA scan result — refusing to retire all items")
+            return []
         with self._pool.connection() as conn:
             rows = conn.execute(
                 "SELECT content_id, display_name, retired_at FROM content_entities "
@@ -1231,6 +1236,12 @@ class Database:
                     conn.execute(
                         "UPDATE content_entities SET retired_at = NOW(), "
                         "retirement_reason = 'Disappeared from Babylon CRDs' "
+                        "WHERE content_id = %s",
+                        (cid,),
+                    )
+                    conn.execute(
+                        "UPDATE performance_scores SET performance_score = 0, "
+                        "score_breakdown = NULL, channel_scores = NULL "
                         "WHERE content_id = %s",
                         (cid,),
                     )
@@ -2888,12 +2899,20 @@ class Database:
                 if synced_content_ids:
                     id_list = list(synced_content_ids)
                     cur.execute(
-                        "DELETE FROM performance_channels WHERE content_id != ALL(%s)",
+                        """DELETE FROM performance_channels pc
+                           USING content_entities ce
+                           WHERE pc.content_id = ce.content_id
+                             AND ce.retired_at IS NULL
+                             AND pc.content_id != ALL(%s)""",
                         (id_list,),
                     )
                     deleted += cur.rowcount
                     cur.execute(
-                        "DELETE FROM performance_scores WHERE content_id != ALL(%s)",
+                        """DELETE FROM performance_scores ps
+                           USING content_entities ce
+                           WHERE ps.content_id = ce.content_id
+                             AND ce.retired_at IS NULL
+                             AND ps.content_id != ALL(%s)""",
                         (id_list,),
                     )
                     deleted += cur.rowcount
@@ -2922,8 +2941,8 @@ class Database:
                    END AS stage_priority
             FROM babylon_items bi
             JOIN content_entities ce ON ce.content_id = bi.content_id
-            WHERE bi.ci_name = ANY(%s)
-            ORDER BY stage_priority, ce.retired_at NULLS FIRST
+            WHERE bi.ci_name = ANY(%s) AND ce.retired_at IS NULL
+            ORDER BY stage_priority
         """
         result = {}
         with self._pool.connection() as conn:
