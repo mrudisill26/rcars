@@ -158,7 +158,7 @@ async def performance_dashboard(
             item["performance_score"] = w.get("performance_score", 0)
 
     base_names = [i["catalog_base_name"] for i in items]
-    stages_map = db.get_stages_for_base_names(base_names)
+    stages_map = db.get_stages_for_base_names(base_names, include_retired=include_retired in ("true", "only", True))
     owners_map = db.get_owners_for_base_names(base_names)
 
     from rcars.services.reporting_sync import compute_sales_impact
