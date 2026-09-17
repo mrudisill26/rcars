@@ -148,7 +148,7 @@ Entry point: `rcars` (installed via `pip install -e ".[dev]"`). Run `rcars --hel
 
 ## Build & Deploy
 
-Every tag applies all manifests first (idempotent), so the BuildConfig always matches the branch in `git_ref`. No more tag ordering bugs.
+Every Ansible tag applies all manifests first (idempotent), so the BuildConfig always matches the ref. Dev uses `git_ref: main`. Prod uses `git_ref: v1.4.5` (a git tag) — update `ansible/vars/prod.yml` to the new tag before deploying.
 
 ```bash
 # Full deploy (manifests + build API + build frontend + migrate + smoke test)
@@ -174,9 +174,9 @@ Ansible vars files (`ansible/vars/dev.yml`, `ansible/vars/prod.yml`) contain sec
 
 ## Git Workflow
 
-- **Direct pushes to `main` are allowed** for routine changes (docs, backlog, small fixes).
-- **Feature branches with PRs are preferred** for non-trivial changes. Create a branch, open a PR, and let CodeRabbit review before merging.
-- **Production deploys require a PR.** Merging `main` → `production` must always go through a pull request — never push directly to `production`.
+- **All changes go through feature branches and PRs.** Create a branch, open a PR, let CodeRabbit review, then squash merge into main. No direct pushes to main.
+- **No `production` branch.** Production deploys use git tags, not a branch. The `production` branch is deprecated.
+- **Production deploy flow:** test on dev → tag main (e.g. `v1.4.6`) → create GitHub release from tag → update `ansible/vars/prod.yml` `git_ref` to the new tag → deploy with `-e env=prod`.
 - **CodeRabbit** is installed on this repo and provides automated code reviews on PRs. Wait for its review before merging.
 - **Batch commits, push at milestones.** Each build pulls the latest from git, so batch related changes into one push before triggering.
 - **Commit and push before building.** Never use `oc start-build --from-dir` with uncommitted changes.
