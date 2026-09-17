@@ -1802,7 +1802,6 @@ details.ca-band-section:not([open]) > .ca-band-header {
   outline: 2px solid var(--pf-t--global--color--brand--default);
   outline-offset: -2px;
 }
-
 .wl-multiselect-panel {
   position: absolute;
   top: 100%;
