@@ -564,10 +564,11 @@ def reporting_db_group():
 
 
 @reporting_db_group.command("sync")
+@click.option("--field-source", is_flag=True, default=False, help="Only sync field source content provisions")
 @click.pass_context
-def reporting_db_sync(ctx):
+def reporting_db_sync(ctx, field_source: bool):
     """Sync reporting metrics from RHDP MCP server."""
-    from rcars.services.reporting_sync import run_reporting_sync
+    from rcars.services.reporting_sync import run_reporting_sync, run_field_source_sync
 
     settings = Settings()
     if not settings.reporting_mcp_url or not settings.reporting_mcp_token:
@@ -575,16 +576,26 @@ def reporting_db_sync(ctx):
         raise SystemExit(1)
 
     db = Database(settings.database_url)
-    _print("Syncing reporting metrics from MCP server...")
+
+    if not field_source:
+        _print("Syncing reporting metrics from MCP server...")
+        try:
+            result = run_reporting_sync(db, settings)
+            _print(f"  Synced: {result['synced']} metrics")
+            _print(f"  Orphans removed: {result['orphans_removed']}")
+            _print(f"  Provisions: {result['provisions_rows']}, Touched: {result['touched_rows']}, "
+                   f"Closed: {result['closed_rows']}, Cost: {result['cost_rows']}, Dates: {result['date_rows']}")
+        except Exception as e:
+            _print(f"ERROR: {e}")
+            raise SystemExit(1)
+
+    _print("Syncing field source content provisions...")
     try:
-        result = run_reporting_sync(db, settings)
-        _print(f"  Synced: {result['synced']} metrics")
-        _print(f"  Orphans removed: {result['orphans_removed']}")
-        _print(f"  Provisions: {result['provisions_rows']}, Touched: {result['touched_rows']}, "
-               f"Closed: {result['closed_rows']}, Cost: {result['cost_rows']}, Dates: {result['date_rows']}")
+        fs_result = run_field_source_sync(db, settings)
+        _print(f"  OCP: {fs_result.get('ocp', 0)}, RHEL: {fs_result.get('rhel', 0)}, "
+               f"Total: {fs_result.get('total', 0)}")
     except Exception as e:
-        _print(f"ERROR: {e}")
-        raise SystemExit(1)
+        _print(f"WARNING: Field source sync failed: {e}")
 
 
 @reporting_db_group.command("status")
